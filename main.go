@@ -2,7 +2,9 @@
 //
 //	go run . -addr 127.0.0.1:8089
 //
-// Register with Riptide model config: {"url":"http://127.0.0.1:8089/decide"}
+// Deploy behind public HTTPS, then register with Riptide model config:
+// {"url":"https://decisioner.example.com/decide"}.
+// Loopback HTTP is for local smoke tests only.
 package main
 
 import (
@@ -36,7 +38,13 @@ func main() {
 		_, _ = w.Write([]byte("ok"))
 	})
 
-	srv := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	srv := &http.Server{
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       5 * time.Second,
+		WriteTimeout:      5 * time.Second,
+		IdleTimeout:       30 * time.Second,
+	}
 	if err := srv.Serve(lis); err != nil {
 		log.Fatalf("serve: %v", err)
 	}
@@ -47,7 +55,11 @@ func handleDecide(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	body, err := io.ReadAll(io.LimitReader(r.Body, maxBody))
+	body, err := io.ReadAll(io.LimitReader(r.Body, maxBody+1))
+	if len(body) > maxBody {
+		http.Error(w, "request body exceeds 1 MiB", http.StatusRequestEntityTooLarge)
+		return
+	}
 	if err != nil {
 		http.Error(w, "read body", http.StatusBadRequest)
 		return

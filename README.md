@@ -29,13 +29,18 @@ curl -sS -X POST http://127.0.0.1:8089/decide \
 
 ## Register with Riptide
 
-Create a model with `kind: EXTERNAL_ENDPOINT` and config:
+Deploy the service behind an HTTPS proxy with a valid certificate and a public hostname that
+resolves to public IP addresses. Bind to the interface required by your deployment, for example
+`go run . -addr :8089`. Replace the example hostname below with your deployed service, then create
+a model with `kind: EXTERNAL_ENDPOINT` and config:
 
 ```json
-{"url":"http://127.0.0.1:8089/decide"}
+{"url":"https://decisioner.example.com/decide"}
 ```
 
-(`endpoint` is also accepted by serve.) Assign as `SHADOW` before `BOUNDED_AB` or `LIVE`.
+(`endpoint` is also accepted by serve.) The host rejects plain HTTP, loopback, and private-network
+destinations. The localhost command above is a local smoke test. Assign as `SHADOW` before
+`BOUNDED_AB` or `LIVE`.
 
 ## Notes
 
@@ -43,4 +48,8 @@ Create a model with `kind: EXTERNAL_ENDPOINT` and config:
   monorepo dependency. Production hosts send protojson; unknown fields should be ignored if you
   switch to protobuf libraries later.
 - Money is always a decimal string with 4 decimal places.
+- Request bodies may be up to 1 MiB; larger bodies receive HTTP 413. Headers, complete request
+  reads, and response writes each have a 5-second timeout; idle keep-alive connections expire
+  after 30 seconds. These limits suit the starter's quick response; they do not extend the
+  host's shorter decision budget.
 - On error or timeout the host serves the deterministic baseline Decisioner.
